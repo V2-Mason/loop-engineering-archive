@@ -27,7 +27,9 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -oE '^tools/[^/]+/' | sort -u || true)
+          # three-dot = diff from merge-base, so only the PR's own changes count
+          # (two-dot would attribute main's post-branch commits to this PR)
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" | grep -oE '^tools/[^/]+/' | sort -u || true)
           if [ -z "$changed" ]; then
             echo "No tools/* changed in this PR — smoke passes trivially."
             exit 0
