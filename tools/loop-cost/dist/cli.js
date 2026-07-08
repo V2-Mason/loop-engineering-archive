@@ -27,10 +27,17 @@ function parseArgs(argv) {
             json = true;
         else if (a === '--list')
             list = true;
+        else if (a === '--version' || a === '-v')
+            return { help: false, version: true };
         else if (a === '--help' || a === '-h')
-            return { help: true };
+            return { help: true, version: false };
     }
-    return { help: false, pattern, cadence, level, conservative, json, list };
+    return { help: false, version: false, pattern, cadence, level, conservative, json, list };
+}
+async function loadVersion() {
+    const raw = await readFile(path.join(PACKAGE_ROOT, 'package.json'), 'utf8');
+    const pkg = JSON.parse(raw);
+    return pkg.version ?? '0.0.0';
 }
 async function loadRegistry() {
     const candidates = [
@@ -53,6 +60,10 @@ async function loadRegistry() {
 }
 async function main() {
     const args = parseArgs(process.argv.slice(2));
+    if (args.version) {
+        console.log(await loadVersion());
+        process.exit(0);
+    }
     if (args.help) {
         console.log(`loop-cost — estimate daily token spend for loop patterns
 
@@ -66,6 +77,7 @@ Options:
   --conservative         Use slower cadence from ranges (e.g. 15m not 5m)
   --json                 Machine-readable output
   --list                 List pattern ids
+  -v, --version          Print version and exit
   -h, --help             This help
 
 Examples:
