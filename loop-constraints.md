@@ -30,3 +30,9 @@
 
 ---
 <!-- Repo-specific rules above. Add your own below. -->
+
+## Mason's builder/reviewer loop (v0)
+- Builder = Claude Code GitHub App; Reviewer = Codex GitHub App. They coordinate only through the PR, comments, and this repo's contract files — never assume shared memory.
+- Reviewer (Codex) posts comments only; it never pushes commits or merges.
+- Human gates for this loop: (1) authoring/confirming the issue spec, (2) the final merge. Everything else should be automated; count any other human push as a UIPI event in `loop-run-log.md`.
+- After 3 fix rounds on one PR, escalate to Mason — do not keep looping.
