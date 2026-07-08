@@ -30,10 +30,17 @@ function parseArgs(argv: string[]) {
     else if (a === '--conservative') conservative = true;
     else if (a === '--json') json = true;
     else if (a === '--list') list = true;
-    else if (a === '--help' || a === '-h') return { help: true as const };
+    else if (a === '--version' || a === '-v') return { help: false as const, version: true as const };
+    else if (a === '--help' || a === '-h') return { help: true as const, version: false as const };
   }
 
-  return { help: false as const, pattern, cadence, level, conservative, json, list };
+  return { help: false as const, version: false as const, pattern, cadence, level, conservative, json, list };
+}
+
+async function loadVersion(): Promise<string> {
+  const raw = await readFile(path.join(PACKAGE_ROOT, 'package.json'), 'utf8');
+  const pkg = JSON.parse(raw) as { version?: string };
+  return pkg.version ?? '0.0.0';
 }
 
 async function loadRegistry(): Promise<RegistryDoc> {
@@ -58,6 +65,11 @@ async function loadRegistry(): Promise<RegistryDoc> {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
+  if (args.version) {
+    console.log(await loadVersion());
+    process.exit(0);
+  }
+
   if (args.help) {
     console.log(`loop-cost — estimate daily token spend for loop patterns
 
@@ -71,6 +83,7 @@ Options:
   --conservative         Use slower cadence from ranges (e.g. 15m not 5m)
   --json                 Machine-readable output
   --list                 List pattern ids
+  -v, --version          Print version and exit
   -h, --help             This help
 
 Examples:

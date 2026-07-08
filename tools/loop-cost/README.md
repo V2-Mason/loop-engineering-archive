@@ -29,6 +29,7 @@ npm test
 | `--level` | `L1`, `L2`, or `L3` (default `L1`) |
 | `--conservative` | Use slower cadence from ranges |
 | `--json` | Machine-readable output |
+| `--version` | Print version and exit |
 
 ## Scenarios
 
