@@ -4,8 +4,9 @@ name: codex-fix-relay
 # Codex posts a formal pull_request_review only when it has suggestions; clean
 # reviews arrive as issue comments instead, so a submitted review whose body
 # contains "automated review suggestions" means there is something to fix.
-# Posts "@claude" as github-actions[bot]; whether the builder responds to a bot
-# mention MUST be verified. The #D fix-round cap bounds this loop.
+# Posts "@claude" as the TRIGGER_PAT owner (a repo-write account) so the builder
+# accepts it — the builder's actor gate rejects a github-actions[bot] mention, so
+# a PAT is required. The #D fix-round cap bounds this loop.
 
 on:
   pull_request_review:
@@ -23,7 +24,7 @@ jobs:
     steps:
       - name: Ask the builder to address the Codex review
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.TRIGGER_PAT }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
