@@ -1,0 +1,71 @@
+name: codex-gate
+
+# Sets a `codex-review` commit status that is `success` only once the Codex
+# Cloud reviewer (chatgpt-codex-connector) has reviewed the PR's CURRENT head
+# commit, and `pending` otherwise. Make `codex-review` a required status check
+# in branch protection to enforce "Codex must have verified before merge".
+#
+# Re-evaluates when: the PR opens/updates (head changes -> pending until re-review),
+# Codex submits a review, or Codex posts its clean-review comment. Codex is a
+# GitHub App, so its events DO trigger workflows (unlike GITHUB_TOKEN).
+#
+# Rollout: merge first, confirm the status is correct on a live PR, THEN add
+# `codex-review` to the ruleset required checks. Making it required before
+# Codex is reliably triggered would block all merges.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created, deleted]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  gate:
+    # Skip comments on plain (non-PR) issues.
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set codex-review status from Codex's review of the head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -uo pipefail
+          head=$(gh api "repos/$REPO/pulls/$NUM" --jq '.head.sha')
+          echo "PR #$NUM head: $head"
+
+          # Both Codex's formal reviews and its clean-review issue comment carry a
+          # "Reviewed commit: <short-sha>" line. Collect all Codex bodies and see
+          # whether any reviewed-commit is a prefix of the current head sha.
+          bodies=$(
+            { gh api "repos/$REPO/pulls/$NUM/reviews"  --paginate --jq '.[] | select(.user.login | test("codex")) | .body'
+              gh api "repos/$REPO/issues/$NUM/comments" --paginate --jq '.[] | select(.user.login | test("codex")) | .body'
+            } 2>/dev/null
+          )
+
+          reviewed="no"
+          for s in $(printf '%s\n' "$bodies" \
+                       | grep -oiE 'reviewed commit[^0-9a-f]*[0-9a-f]{7,40}' \
+                       | grep -oiE '[0-9a-f]{7,40}$'); do
+            case "$head" in
+              "$s"*) reviewed="yes"; break ;;
+            esac
+          done
+          echo "Codex reviewed current head: $reviewed"
+
+          if [ "$reviewed" = "yes" ]; then
+            state="success"; desc="Codex reviewed the current commit"
+          else
+            state="pending"; desc="Waiting for Codex to review the current commit"
+          fi
+          gh api --method POST "repos/$REPO/statuses/$head" \
+            -f context="codex-review" -f state="$state" -f description="$desc" >/dev/null
+          echo "Set codex-review=$state on $head"
