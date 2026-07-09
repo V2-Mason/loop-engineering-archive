@@ -45,9 +45,13 @@ jobs:
           # Both Codex's formal reviews and its clean-review issue comment carry a
           # "Reviewed commit: <short-sha>" line. Collect all Codex bodies and see
           # whether any reviewed-commit is a prefix of the current head sha.
+          # Match the EXACT Codex GitHub App login, not a substring of "codex":
+          # the `[bot]` suffix is reserved for GitHub Apps and cannot be registered
+          # by a normal user, so an external account cannot spoof a "Reviewed commit"
+          # line to flip this gate on a public repo.
           bodies=$(
-            { gh api "repos/$REPO/pulls/$NUM/reviews"  --paginate --jq '.[] | select(.user.login | test("codex")) | .body'
-              gh api "repos/$REPO/issues/$NUM/comments" --paginate --jq '.[] | select(.user.login | test("codex")) | .body'
+            { gh api "repos/$REPO/pulls/$NUM/reviews"  --paginate --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'
+              gh api "repos/$REPO/issues/$NUM/comments" --paginate --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'
             } 2>/dev/null
           )
 
