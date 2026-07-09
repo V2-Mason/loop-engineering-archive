@@ -1,0 +1,82 @@
+name: codex-gate
+
+# Sets a `codex-review` commit status that is `success` only once the Codex
+# Cloud reviewer (chatgpt-codex-connector) has reviewed the PR's CURRENT head
+# commit, and `pending` otherwise. Make `codex-review` a required status check
+# in branch protection to enforce "Codex must have verified before merge".
+#
+# Re-evaluates when: the PR opens/updates (head changes -> pending until re-review),
+# Codex submits a review, or Codex posts its clean-review comment. Codex is a
+# GitHub App, so its events DO trigger workflows (unlike GITHUB_TOKEN).
+#
+# Rollout: merge first, confirm the status is correct on a live PR, THEN add
+# `codex-review` to the ruleset required checks. Making it required before
+# Codex is reliably triggered would block all merges.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created, deleted]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  gate:
+    # Skip comments on plain (non-PR) issues.
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set codex-review status from Codex's review of the head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -uo pipefail
+          head=$(gh api "repos/$REPO/pulls/$NUM" --jq '.head.sha')
+          echo "PR #$NUM head: $head"
+
+          # Only accept the EXACT Codex GitHub App login (chatgpt-codex-connector[bot]).
+          # The `[bot]` suffix is reserved for GitHub Apps and cannot be registered
+          # by a normal user, so an external account cannot spoof "Reviewed commit".
+          #
+          # Compare FULL 40-char SHAs exactly — never a short-sha prefix match. A
+          # prefix is brute-forceable: an attacker could get Codex to review a
+          # benign commit, then push a different unreviewed commit crafted to share
+          # that prefix and the gate would pass it. So:
+          #   (1) formal Codex reviews carry an exact full-SHA commit_id; and
+          #   (2) clean reviews arrive as an issue comment with a SHORT sha, which
+          #       we resolve to its full sha and compare exactly to head.
+          reviewed="no"
+
+          if gh api "repos/$REPO/pulls/$NUM/reviews" --paginate \
+               --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .commit_id' 2>/dev/null \
+               | grep -qxF "$head"; then
+            reviewed="yes"
+          fi
+
+          if [ "$reviewed" = "no" ]; then
+            for s in $(gh api "repos/$REPO/issues/$NUM/comments" --paginate \
+                         --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body' 2>/dev/null \
+                         | grep -oiE 'reviewed commit[^0-9a-f]*[0-9a-f]{7,40}' \
+                         | grep -oiE '[0-9a-f]{7,40}$' | sort -u); do
+              full=$(gh api "repos/$REPO/commits/$s" --jq '.sha' 2>/dev/null) || continue
+              if [ "$full" = "$head" ]; then reviewed="yes"; break; fi
+            done
+          fi
+          echo "Codex reviewed current head: $reviewed"
+
+          if [ "$reviewed" = "yes" ]; then
+            state="success"; desc="Codex reviewed the current commit"
+          else
+            state="pending"; desc="Waiting for Codex to review the current commit"
+          fi
+          gh api --method POST "repos/$REPO/statuses/$head" \
+            -f context="codex-review" -f state="$state" -f description="$desc" >/dev/null
+          echo "Set codex-review=$state on $head"
