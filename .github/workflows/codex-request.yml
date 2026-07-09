@@ -1,0 +1,32 @@
+name: codex-request
+
+# Requests a Codex review on new/updated PRs so the Cloud reviewer looks at the
+# CURRENT commit — including after the builder pushes fixes (synchronize), which
+# Codex Automatic reviews does NOT cover. Posts "@codex review" as the
+# TRIGGER_PAT owner (a Codex-connected account) — Codex rejects a
+# github-actions[bot] mention, so a PAT is required. Once this works, Codex
+# Automatic reviews can be turned off (codex-request takes over).
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  request:
+    # Fork PRs still fire pull_request runs but never receive secrets.TRIGGER_PAT,
+    # so `gh pr comment` would fail and give every external contributor a red
+    # codex-request check. Codex Automatic reviews remain the fork-PR safety net.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Codex review of the current commit
+        env:
+          GH_TOKEN: ${{ secrets.TRIGGER_PAT }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --repo "$REPO" --body "@codex review"

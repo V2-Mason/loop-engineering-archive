@@ -1,0 +1,37 @@
+name: codex-fix-relay
+
+# When Codex submits a review WITH findings, ask the builder to address it.
+# Codex posts a formal pull_request_review only when it has suggestions; clean
+# reviews arrive as issue comments instead, so a submitted review whose body
+# contains "automated review suggestions" means there is something to fix.
+# Posts "@claude" as the TRIGGER_PAT owner (a repo-write account) so the builder
+# accepts it — the builder's actor gate rejects a github-actions[bot] mention, so
+# a PAT is required. The #D fix-round cap bounds this loop.
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  relay:
+    # Only relay to the builder on its own PRs: same-repo (fork branches named
+    # claude/* must not qualify, and forks lack TRIGGER_PAT anyway) AND a claude/*
+    # head branch. Otherwise any human or contributor PR that Codex reviews with
+    # findings would summon the builder via the write-access PAT.
+    if: >-
+      github.event.review.user.login == 'chatgpt-codex-connector[bot]' &&
+      contains(github.event.review.body, 'automated review suggestions') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'claude/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask the builder to address the Codex review
+        env:
+          GH_TOKEN: ${{ secrets.TRIGGER_PAT }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR" --repo "$REPO" --body "@claude please address Codex's review comments above and push the fixes to this PR branch. Do not resolve the review threads yourself — the reviewer and a human own that."
