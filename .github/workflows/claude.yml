@@ -32,6 +32,40 @@ jobs:
       id-token: write
       actions: read # read CI results on PRs
     steps:
+      # Mechanical fix-round cap. Runs inside the builder's own (non-GITHUB_TOKEN-
+      # triggered) run and counts builder commits BEFORE acting, so it avoids the
+      # "GITHUB_TOKEN push does not trigger workflows" pitfall and any race.
+      - name: Fix-round cap guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number || github.event.pull_request.number }}
+          # PR-ness from the event payload (deterministic), NOT an API probe that
+          # cannot tell 404 (not a PR) from rate-limit/permission/transient errors.
+          IS_PR: ${{ github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment' || (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) }}
+        run: |
+          set -uo pipefail
+          if [ "$IS_PR" != "true" ]; then
+            echo "Not a PR context; no fix-round cap."
+            exit 0
+          fi
+          # It IS a PR. This step is the safety circuit breaker, so fail CLOSED
+          # (stop the builder) if the commit count cannot be fetched.
+          if ! builder_commits=$(gh api "repos/$REPO/pulls/$NUM/commits" --paginate \
+                --jq '.[] | select((.author.login // "") == "claude[bot]" or (.commit.author.name // "") == "claude[bot]") | .sha' 2>/dev/null); then
+            echo "::error::Could not fetch PR commits to enforce the fix-round cap; failing closed."
+            exit 1
+          fi
+          n=$(printf '%s' "$builder_commits" | grep -c . || true)
+          echo "builder commits on PR #$NUM: $n (cap: 1 impl + 3 fixes = 4)"
+          if [ "$n" -ge 4 ]; then
+            gh label create needs-human -R "$REPO" -c B60205 -d "Fix-round cap reached; a human must clear before the builder acts again" 2>/dev/null || true
+            gh pr edit "$NUM" -R "$REPO" --add-label needs-human || true
+            gh pr comment "$NUM" -R "$REPO" --body "Fix-round cap reached: $n builder commits (1 implementation + 3 fix rounds). The builder stops here. A human must review and remove the \`needs-human\` label before @claude will act on this PR again."
+            echo "::error::Fix-round cap reached ($n builder commits). Escalated to human."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
