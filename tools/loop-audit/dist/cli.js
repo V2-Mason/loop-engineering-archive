@@ -1,7 +1,17 @@
 #!/usr/bin/env node
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { auditProject } from './auditor.js';
 import { printContributorCta } from './contributor-cta.js';
 import { formatBadge, formatHuman, formatJson, formatMarkdown } from './reporter.js';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = path.resolve(__dirname, '..');
+async function loadVersion() {
+    const raw = await readFile(path.join(PACKAGE_ROOT, 'package.json'), 'utf8');
+    const pkg = JSON.parse(raw);
+    return pkg.version ?? '0.0.0';
+}
 const args = process.argv.slice(2);
 const target = args.find((a) => !a.startsWith('-')) || '.';
 const json = args.includes('--json');
@@ -9,6 +19,11 @@ const md = args.includes('--md');
 const suggest = args.includes('--suggest') || args.includes('--fix');
 const badge = args.includes('--badge');
 const help = args.includes('--help') || args.includes('-h');
+const version = args.includes('--version') || args.includes('-v');
+if (version) {
+    console.log(await loadVersion());
+    process.exit(0);
+}
 if (help) {
     console.log(`loop-audit — Loop Readiness Score CLI (v1.4+)
 
@@ -16,11 +31,12 @@ Usage:
   loop-audit [path] [options]
 
 Options:
-  --json      JSON output (for CI / scripting)
-  --md        Markdown report
-  --suggest   Show copy-from-template commands for missing pieces (recommended on first runs)
-  --badge     Markdown README badge (Loop Ready level + score)
-  --help, -h  This help
+  --json         JSON output (for CI / scripting)
+  --md           Markdown report
+  --suggest      Show copy-from-template commands for missing pieces (recommended on first runs)
+  --badge        Markdown README badge (Loop Ready level + score)
+  --version, -v  Print version and exit
+  --help, -h     This help
 
 New in v1.4:
   • Dynamic "loop activity" detection (git history, "Last run" in STATE, scheduled workflows)
