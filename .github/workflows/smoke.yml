@@ -1,0 +1,45 @@
+name: smoke
+
+# Minimal viable check on PRs: for each tool changed in this PR, run its
+# build + unit tests (`npm test` = build + node --test). If no tool changed,
+# the job passes trivially. Objective anchor for the builder/reviewer loop.
+
+on:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build + test changed tools
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # three-dot = diff from merge-base, so only the PR's own changes count
+          # (two-dot would attribute main's post-branch commits to this PR)
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" | grep -oE '^tools/[^/]+/' | sort -u || true)
+          if [ -z "$changed" ]; then
+            echo "No tools/* changed in this PR — smoke passes trivially."
+            exit 0
+          fi
+          echo "Changed tools:"; echo "$changed"
+          fail=0
+          for d in $changed; do
+            if [ -f "${d}package.json" ]; then
+              echo "===== smoke: ${d} ====="
+              ( cd "$d" && npm ci && npm test ) || { echo "SMOKE FAILED: $d"; fail=1; }
+            fi
+          done
+          exit $fail

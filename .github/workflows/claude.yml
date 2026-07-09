@@ -47,5 +47,5 @@ jobs:
           # TEMP (debugging issue #2): surface full model output in logs. Remove once builder is verified.
           show_full_output: true
           claude_args: |
-            --allowedTools "Edit,Write,MultiEdit,Read,Glob,Grep,Bash(npm ci),Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*),Bash(node dist/*)"
+            --allowedTools "Edit,Write,MultiEdit,Read,Glob,Grep,Bash(npm ci),Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm test),Bash(node --test),Bash(npm run lint:*),Bash(node dist/*)"
             --system-prompt "You are the builder in a builder/reviewer loop. Follow AGENTS.md and loop-constraints.md in this repo. One issue -> one branch -> one focused PR. Run the repo's quality gates before opening or updating a PR. When addressing Codex review comments, push fixes to the same PR branch; never open a new PR and never merge. Stop and ask for a human after 3 fix rounds on one PR."
