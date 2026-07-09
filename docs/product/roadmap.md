@@ -8,7 +8,8 @@
 |------|------|----------|
 | v0.0 bootstrap | 完成 | fork、Claude Code App + Codex App、`CLAUDE_CODE_OAUTH_TOKEN` secret、双厂配置 |
 | v0.1 双厂最小闭环 | 完成 | 单 issue：builder(Claude) → PR → reviewer(Codex) → 人 merge，真实跑通一次(issue #2 → PR #4) |
-| **v0.2 Discipline** | 进行中 | 让单-issue 闭环 hands-off：自动开 PR + Codex 自动审 + smoke-test CI + 修复轮数上限 + 触发治理；并 project 化 |
+| v0.2 Discipline | 完成 | 单-issue 纪律护栏：smoke CI + Codex 自动审 + 修复轮数机械封顶 + 触发治理 + 分支保护；自动开 PR(#B)取消；Path A(codex-gate + return-loop)已 live。UIPI 未降(≈2),详见 `mason-loop/loops/retro-002.md` |
+| **v0.2.5 Reliability / Convergence** | 计划（下一轮） | 补"可靠性轴"（retro-002）：reviewer 换 **Codex CLI 跑 loop-verifier**(P3)+ `loop-context`/`loop-ledger` 收敛 review↔fix(P2)+ `loop-cost`/`loop-run-log` 机械测 UIPI(P5)+ 状态从 GitHub 派生(P4)。目标：单-issue UIPI 真降到 ~1 且稳定，再上 v0.3 |
 | v0.3 Triage / Intake | 计划 | 多-issue：去重、冲突/重复检测、优先级、backlog 状态 + Projects 排序 |
 | v0.4 Orchestration | 计划 | 评估 GitHub Agentic Workflows(gh-aw);或更细的 Claude/Codex 分工 |
 | v0.5 Release | 计划 | tag / release pipeline / release notes；多 issue 并行(worktree 隔离) |
