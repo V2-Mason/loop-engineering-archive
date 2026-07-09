@@ -1,27 +1,28 @@
 name: Claude Code (builder)
 
 # Builder agent for Mason's builder/reviewer loop.
-# Triggered by @claude in issues and PR comments. Implements the issue on a
-# branch and opens/updates a PR; addresses Codex review comments on the same
-# branch. Conventions and review contract live in AGENTS.md / loop-constraints.md.
+# Triggered ONLY by @claude in issue/PR comments and PR reviews — NOT on issue
+# open/assign. A write-access human must comment @claude to launch the builder
+# (trigger governance). Conventions/review contract live in AGENTS.md / loop-constraints.md.
 
 on:
   issue_comment:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  issues:
-    types: [opened, assigned]
   pull_request_review:
     types: [submitted]
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
 
 jobs:
   claude:
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -44,8 +45,6 @@ jobs:
           # To use pay-as-you-go API billing instead, swap this line for:
           #   anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # TEMP (debugging issue #2): surface full model output in logs. Remove once builder is verified.
-          show_full_output: true
           claude_args: |
             --allowedTools "Edit,Write,MultiEdit,Read,Glob,Grep,Bash(npm ci),Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm test),Bash(node --test),Bash(npm run lint:*),Bash(node dist/*)"
             --system-prompt "You are the builder in a builder/reviewer loop. Follow AGENTS.md and loop-constraints.md in this repo. One issue -> one branch -> one focused PR. Run the repo's quality gates before opening or updating a PR. When addressing Codex review comments, push fixes to the same PR branch; never open a new PR and never merge. Stop and ask for a human after 3 fix rounds on one PR."
