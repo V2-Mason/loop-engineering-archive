@@ -1,0 +1,27 @@
+name: codex-request
+
+# Requests a Codex review on new/updated PRs so the Cloud reviewer looks at the
+# CURRENT commit — including after the builder pushes fixes (synchronize), which
+# Codex Automatic reviews does NOT cover. Posts "@codex review" as
+# github-actions[bot]; whether Codex responds to a bot mention MUST be verified.
+# Until confirmed, keep Automatic reviews ON as a safety net (expect a duplicate
+# review on open); once confirmed working, Automatic reviews can be turned off.
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  request:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Codex review of the current commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --repo "$REPO" --body "@codex review"

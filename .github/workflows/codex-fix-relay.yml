@@ -1,0 +1,30 @@
+name: codex-fix-relay
+
+# When Codex submits a review WITH findings, ask the builder to address it.
+# Codex posts a formal pull_request_review only when it has suggestions; clean
+# reviews arrive as issue comments instead, so a submitted review whose body
+# contains "automated review suggestions" means there is something to fix.
+# Posts "@claude" as github-actions[bot]; whether the builder responds to a bot
+# mention MUST be verified. The #D fix-round cap bounds this loop.
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  relay:
+    if: >-
+      github.event.review.user.login == 'chatgpt-codex-connector[bot]' &&
+      contains(github.event.review.body, 'automated review suggestions')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask the builder to address the Codex review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR" --repo "$REPO" --body "@claude please address Codex's review comments above and push the fixes to this PR branch. Do not resolve the review threads yourself — the reviewer and a human own that."
