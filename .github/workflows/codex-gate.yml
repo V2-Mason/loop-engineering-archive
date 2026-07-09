@@ -42,27 +42,34 @@ jobs:
           head=$(gh api "repos/$REPO/pulls/$NUM" --jq '.head.sha')
           echo "PR #$NUM head: $head"
 
-          # Both Codex's formal reviews and its clean-review issue comment carry a
-          # "Reviewed commit: <short-sha>" line. Collect all Codex bodies and see
-          # whether any reviewed-commit is a prefix of the current head sha.
-          # Match the EXACT Codex GitHub App login, not a substring of "codex":
-          # the `[bot]` suffix is reserved for GitHub Apps and cannot be registered
-          # by a normal user, so an external account cannot spoof a "Reviewed commit"
-          # line to flip this gate on a public repo.
-          bodies=$(
-            { gh api "repos/$REPO/pulls/$NUM/reviews"  --paginate --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'
-              gh api "repos/$REPO/issues/$NUM/comments" --paginate --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'
-            } 2>/dev/null
-          )
-
+          # Only accept the EXACT Codex GitHub App login (chatgpt-codex-connector[bot]).
+          # The `[bot]` suffix is reserved for GitHub Apps and cannot be registered
+          # by a normal user, so an external account cannot spoof "Reviewed commit".
+          #
+          # Compare FULL 40-char SHAs exactly — never a short-sha prefix match. A
+          # prefix is brute-forceable: an attacker could get Codex to review a
+          # benign commit, then push a different unreviewed commit crafted to share
+          # that prefix and the gate would pass it. So:
+          #   (1) formal Codex reviews carry an exact full-SHA commit_id; and
+          #   (2) clean reviews arrive as an issue comment with a SHORT sha, which
+          #       we resolve to its full sha and compare exactly to head.
           reviewed="no"
-          for s in $(printf '%s\n' "$bodies" \
-                       | grep -oiE 'reviewed commit[^0-9a-f]*[0-9a-f]{7,40}' \
-                       | grep -oiE '[0-9a-f]{7,40}$'); do
-            case "$head" in
-              "$s"*) reviewed="yes"; break ;;
-            esac
-          done
+
+          if gh api "repos/$REPO/pulls/$NUM/reviews" --paginate \
+               --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .commit_id' 2>/dev/null \
+               | grep -qxF "$head"; then
+            reviewed="yes"
+          fi
+
+          if [ "$reviewed" = "no" ]; then
+            for s in $(gh api "repos/$REPO/issues/$NUM/comments" --paginate \
+                         --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body' 2>/dev/null \
+                         | grep -oiE 'reviewed commit[^0-9a-f]*[0-9a-f]{7,40}' \
+                         | grep -oiE '[0-9a-f]{7,40}$' | sort -u); do
+              full=$(gh api "repos/$REPO/commits/$s" --jq '.sha' 2>/dev/null) || continue
+              if [ "$full" = "$head" ]; then reviewed="yes"; break; fi
+            done
+          fi
           echo "Codex reviewed current head: $reviewed"
 
           if [ "$reviewed" = "yes" ]; then
