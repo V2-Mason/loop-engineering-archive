@@ -38,6 +38,7 @@ loop-audit . --json       # machine-readable
 loop-audit . --md         # markdown report
 loop-audit . --suggest    # copy-from-template commands + activity tips (all tools)
 loop-audit . --badge      # markdown README badge (Loop Ready level + score)
+loop-audit --version      # print version and exit (-v also works)
 ```
 
 Exit code `2` if score < 40 (useful for CI gates once your project is loop-ready).
