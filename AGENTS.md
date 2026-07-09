@@ -34,6 +34,11 @@ These apply when Codex reviews a PR opened by the Claude Code builder in this re
 - If the PR has already gone through 3 fix rounds, stop proposing and ask for human review instead.
 - Post review as PR comments only; do not push commits (the builder owns fixes).
 
+## Trigger governance
+
+- The builder does NOT launch when an issue is opened or assigned. It launches only when a **write-access** person comments `@claude` on an issue/PR (or in a PR review). This forces a human to triage/approve an issue before the builder acts on it.
+- Flow: anyone files an issue → a maintainer reviews it → the maintainer comments `@claude` to hand it to the builder.
+
 ## Builder (Claude Code)
 
 - One issue → one branch → one PR; keep the change minimal and focused.
