@@ -40,15 +40,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           NUM: ${{ github.event.issue.number || github.event.pull_request.number }}
+          # PR-ness from the event payload (deterministic), NOT an API probe that
+          # cannot tell 404 (not a PR) from rate-limit/permission/transient errors.
+          IS_PR: ${{ github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment' || (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) }}
         run: |
           set -uo pipefail
-          # Fix rounds only exist on PRs. If NUM is not a PR (e.g. a plain issue), skip.
-          if ! gh api "repos/$REPO/pulls/$NUM" >/dev/null 2>&1; then
+          if [ "$IS_PR" != "true" ]; then
             echo "Not a PR context; no fix-round cap."
             exit 0
           fi
-          n=$(gh api "repos/$REPO/pulls/$NUM/commits" --paginate \
-                --jq '[.[] | select((.author.login // "") == "claude[bot]" or (.commit.author.name // "") == "claude[bot]")] | length')
+          # It IS a PR. This step is the safety circuit breaker, so fail CLOSED
+          # (stop the builder) if the commit count cannot be fetched.
+          if ! builder_commits=$(gh api "repos/$REPO/pulls/$NUM/commits" --paginate \
+                --jq '.[] | select((.author.login // "") == "claude[bot]" or (.commit.author.name // "") == "claude[bot]") | .sha' 2>/dev/null); then
+            echo "::error::Could not fetch PR commits to enforce the fix-round cap; failing closed."
+            exit 1
+          fi
+          n=$(printf '%s' "$builder_commits" | grep -c . || true)
           echo "builder commits on PR #$NUM: $n (cap: 1 impl + 3 fixes = 4)"
           if [ "$n" -ge 4 ]; then
             gh label create needs-human -R "$REPO" -c B60205 -d "Fix-round cap reached; a human must clear before the builder acts again" 2>/dev/null || true
