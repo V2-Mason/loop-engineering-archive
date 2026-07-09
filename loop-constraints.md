@@ -36,3 +36,4 @@
 - Reviewer (Codex) posts comments only; it never pushes commits or merges.
 - Human gates for this loop: (1) authoring/confirming the issue spec, (2) the final merge. Everything else should be automated; count any other human push as a UIPI event in `loop-run-log.md`.
 - After 3 fix rounds on one PR, escalate to Mason — do not keep looping.
+- The builder (maker) must NOT resolve its own review threads. Push the fix and let the reviewer (Codex) re-review; a human resolves the thread once satisfied. The maker never signs off on its own work — that is the acceptance gate.
