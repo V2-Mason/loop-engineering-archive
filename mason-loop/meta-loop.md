@@ -74,7 +74,7 @@ Mason merge                                        ← 人工介入点 2（merge
 
 ## 四、北极星指标
 
-**每 issue 的计划外人工介入次数（UIPI）**：在 spec 确认与最终 merge 两个批准点之外，人为推动流程所做的任何操作（手动触发审查、手动改代码、手动发修复指令）计 1 次。挂在本 repo 现成的 `loop-run-log.md` 的 human-escalations 计数上。
+**每 issue 的计划外人工介入次数（UIPI）**：在 spec 确认与最终 merge 两个批准点之外，人为推动流程所做的任何操作（手动触发审查、手动改代码、手动发修复指令）计 1 次。结构化记录在 `mason-loop/uipi-log.md`（每 issue 一条，含介入明细 + 计数；定义与判定标准见该文件）。注：根目录 `loop-run-log.md` 是运维型 loop(daily-triage)的 per-run 日志，与 UIPI 分开。
 
 - 目标方向：UIPI 递减；v0.1 基线预计 2-4 次，v0.5 目标 ≤1 次。
 - 质量护栏：merge 后引发 revert/补丁的比例不升高。指标下降但护栏破损视为无效改进。
@@ -97,7 +97,7 @@ Vision / Principles 由不做清单固定：不自动 merge、agent 行为全部
 
 ## 六、Retro 模板
 
-见 loops/retro-001.md（每轮复制一份，递增编号）。
+见 `loops/retro-TEMPLATE.md`（每轮复制为 `retro-NNN.md`，递增编号；含必填 UIPI 实测字段）。retro-001 / retro-002 为已完成实例。
 
 ## 七、v0 搭建清单（含授权分级，详见项目根 plan）
 
