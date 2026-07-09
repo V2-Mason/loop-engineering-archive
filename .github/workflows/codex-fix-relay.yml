@@ -17,9 +17,13 @@ permissions:
 
 jobs:
   relay:
+    # Only relay to the builder on its own PRs (claude/* branches). Otherwise any
+    # human or contributor PR that Codex reviews with findings would summon the
+    # builder via the write-access PAT.
     if: >-
       github.event.review.user.login == 'chatgpt-codex-connector[bot]' &&
-      contains(github.event.review.body, 'automated review suggestions')
+      contains(github.event.review.body, 'automated review suggestions') &&
+      startsWith(github.event.pull_request.head.ref, 'claude/')
     runs-on: ubuntu-latest
     steps:
       - name: Ask the builder to address the Codex review

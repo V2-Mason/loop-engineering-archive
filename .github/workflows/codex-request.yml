@@ -16,7 +16,12 @@ permissions:
 
 jobs:
   request:
-    if: github.event.pull_request.draft == false
+    # Fork PRs still fire pull_request runs but never receive secrets.TRIGGER_PAT,
+    # so `gh pr comment` would fail and give every external contributor a red
+    # codex-request check. Codex Automatic reviews remain the fork-PR safety net.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Request Codex review of the current commit
